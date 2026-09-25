@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -109,3 +111,74 @@ class WitherBatch(models.Model):
 
     def __str__(self):
         return f"{self.trough} @ {self.startedAt:%Y-%m-%d %H:%M}"
+
+
+class LeafIntake(models.Model):
+    """鲜叶签收：仅「装叶中」槽位可签收，累计受装叶量约束。"""
+
+    trough = models.ForeignKey(
+        Trough,
+        on_delete=models.CASCADE,
+        related_name="intakes",
+        verbose_name="所属槽位",
+    )
+    leafKg = models.DecimalField("鲜叶千克(kg)", max_digits=10, decimal_places=2)
+    receivedAt = models.DateTimeField("签收时刻")
+    supplierVillage = models.CharField("供货村名", max_length=120)
+    receiver = models.CharField("签收人", max_length=80)
+    isReversed = models.BooleanField("已冲销", default=False)
+    reversedAt = models.DateTimeField("冲销时刻", null=True, blank=True)
+    reversedBy = models.CharField("冲销人", max_length=80, blank=True, default="")
+
+    class Meta:
+        ordering = ["-receivedAt", "-id"]
+        verbose_name = "鲜叶签收"
+        verbose_name_plural = "鲜叶签收"
+
+    def __str__(self):
+        return f"{self.trough} 签收 {self.leafKg}kg @ {self.receivedAt:%Y-%m-%d %H:%M}"
+
+    @staticmethod
+    def accumulated_kg(trough, exclude_pk=None):
+        """该槽未冲销签收的累计千克（不含 exclude_pk 指定记录）。"""
+        qs = LeafIntake.objects.filter(trough=trough, isReversed=False)
+        if exclude_pk is not None:
+            qs = qs.exclude(pk=exclude_pk)
+        return qs.aggregate(total=models.Sum("leafKg"))["total"] or Decimal("0")
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.leafKg is not None and self.leafKg <= 0:
+            errors.setdefault("leafKg", []).append("鲜叶千克必须为正数。")
+        if self.isReversed:
+            # 冲销记录不再参与装叶量/状态联锁校验
+            if errors:
+                raise ValidationError(errors)
+            return
+        if self.trough_id:
+            trough = self.trough
+            if trough.status != Trough.STATUS_LOADING:
+                errors.setdefault("trough", []).append(
+                    "仅「装叶中」的槽位可签收鲜叶，「萎凋中」与「可下槽」拒绝签收。"
+                )
+            elif self.leafKg is not None and self.leafKg > 0:
+                accumulated = LeafIntake.accumulated_kg(trough, exclude_pk=self.pk)
+                if accumulated + self.leafKg > trough.loadKg:
+                    errors.setdefault("leafKg", []).append(
+                        f"累计签收超出装叶量：该槽已累计 {accumulated} kg，"
+                        f"装叶量上限 {trough.loadKg} kg，本次 {self.leafKg} kg 被拒绝。"
+                    )
+                latest = trough.latest_batch()
+                if latest is not None and self.leafKg > latest.targetMoisture:
+                    errors.setdefault("leafKg", []).append(
+                        f"单次签收超出约定上限：该槽最新批次目标含水率为 "
+                        f"{latest.targetMoisture}%，按约定单次签收不得超过 "
+                        f"{latest.targetMoisture} kg，本次 {self.leafKg} kg 被拒绝。"
+                    )
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)

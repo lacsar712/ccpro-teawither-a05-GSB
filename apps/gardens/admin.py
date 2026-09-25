@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Garden, Trough, WitherBatch
+from .models import Garden, LeafIntake, Trough, WitherBatch
 
 
 @admin.register(Garden)
@@ -27,3 +27,20 @@ class WitherBatchAdmin(admin.ModelAdmin):
         "rollGrade",
     )
     list_filter = ("rollGrade",)
+
+
+@admin.register(LeafIntake)
+class LeafIntakeAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "trough",
+        "leafKg",
+        "receivedAt",
+        "supplierVillage",
+        "receiver",
+        "isReversed",
+        "reversedAt",
+        "reversedBy",
+    )
+    list_filter = ("isReversed", "supplierVillage")
+    search_fields = ("supplierVillage", "receiver")

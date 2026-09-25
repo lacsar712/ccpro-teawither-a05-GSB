@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}新建签收{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>新建鲜叶签收</h1>
+  <a class="btn btn-secondary" href="{% url 'intake_list' %}">返回列表</a>
+</div>
+<div class="card">
+  <form method="post" class="form-grid">
+    {% csrf_token %}
+    {% for field in form %}
+    <div class="form-row">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {{ field.errors }}
+    </div>
+    {% endfor %}
+    {{ form.non_field_errors }}
+    <button class="btn" type="submit">保存</button>
+  </form>
+  <p class="muted" style="margin-top:1rem">签收约定：仅「装叶中」槽位可签收；鲜叶千克必须为正；同槽累计签收不得超过该槽装叶量，超出将拒绝并回显已累计千克；若该槽已有萎凋批次，单次签收千克不得超过最新批次目标含水率的数值（如目标含水率 40% 即单次上限 40 kg）。</p>
+</div>
+{% endblock %}

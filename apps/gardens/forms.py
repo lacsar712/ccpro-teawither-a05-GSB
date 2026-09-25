@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Garden, Trough, WitherBatch
+from .models import Garden, LeafIntake, Trough, WitherBatch
 
 
 class GardenForm(forms.ModelForm):
@@ -64,3 +64,30 @@ class WitherBatchForm(forms.ModelForm):
 
             local = timezone.localtime(self.instance.startedAt)
             self.initial["startedAt"] = local.strftime("%Y-%m-%dT%H:%M")
+
+
+class LeafIntakeForm(forms.ModelForm):
+    class Meta:
+        model = LeafIntake
+        fields = ["trough", "leafKg", "receivedAt", "supplierVillage", "receiver"]
+        widgets = {
+            "trough": forms.Select(attrs={"class": "input"}),
+            "leafKg": forms.NumberInput(
+                attrs={"class": "input", "step": "0.01", "min": "0.01"}
+            ),
+            "receivedAt": forms.DateTimeInput(
+                attrs={"class": "input", "type": "datetime-local"},
+                format="%Y-%m-%dT%H:%M",
+            ),
+            "supplierVillage": forms.TextInput(attrs={"class": "input"}),
+            "receiver": forms.TextInput(attrs={"class": "input"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["receivedAt"].input_formats = [
+            "%Y-%m-%dT%H:%M",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+        ]
+        self.fields["trough"].queryset = Trough.objects.select_related("garden")

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}鲜叶签收{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>鲜叶签收</h1>
+  <div class="actions">
+    <button class="btn btn-secondary btn-sm"
+            hx-get="{% url 'intake_list' %}"
+            hx-target="#intake-table"
+            hx-swap="innerHTML">刷新列表</button>
+    <a class="btn" href="{% url 'intake_create' %}">新建签收</a>
+  </div>
+</div>
+<div class="card" id="intake-table">
+  {% include "intakes/_table.html" %}
+</div>
+<p class="muted" style="margin-top:1rem">签收约定：仅「装叶中」槽位可签收；鲜叶千克必须为正；同槽累计签收不得超过该槽装叶量；若该槽已有萎凋批次，单次签收千克不得超过最新批次目标含水率的数值（如目标含水率 40% 即单次上限 40 kg）。已冲销记录不在本列表显示，且不计入累计与首页本周合计。</p>
+{% endblock %}

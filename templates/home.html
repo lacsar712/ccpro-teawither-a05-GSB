@@ -11,6 +11,8 @@
   <div class="stat"><div class="num">{{ loading_count }}</div><div class="label">装叶中</div></div>
   <div class="stat"><div class="num">{{ withering_count }}</div><div class="label">萎凋中</div></div>
   <div class="stat"><div class="num">{{ ready_count }}</div><div class="label">可下槽</div></div>
+  <div class="stat"><div class="num">{{ week_intake_kg }}</div><div class="label">本周签收(kg)</div></div>
 </div>
 <p class="muted" style="margin-top:1.25rem">规则提示：槽位设为「可下槽」时，最新批次实测含水率须已填写且不超过 40%。</p>
+<p class="muted">鲜叶签收约定：仅「装叶中」槽位可签收；鲜叶千克必须为正；同槽累计签收不得超过该槽装叶量；若该槽已有萎凋批次，单次签收千克不得超过最新批次目标含水率的数值（如 40% 即单次上限 40 kg）；冲销签收仅主管可操作。本周签收(kg) 为签收列表中本周（周一起）未冲销各行千克之和。</p>
 {% endblock %}

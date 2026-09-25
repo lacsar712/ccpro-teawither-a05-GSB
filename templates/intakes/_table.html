@@ -1,0 +1,32 @@
+{% if intakes %}
+<table class="data">
+  <thead>
+    <tr>
+      <th>茶园/槽位</th>
+      <th>签收时刻</th>
+      <th>鲜叶千克(kg)</th>
+      <th>供货村名</th>
+      <th>签收人</th>
+      <th>操作</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for i in intakes %}
+    <tr>
+      <td>{{ i.trough.garden.name }} / {{ i.trough.troughCode }}</td>
+      <td>{{ i.receivedAt|date:"Y-m-d H:i" }}</td>
+      <td>{{ i.leafKg }}</td>
+      <td>{{ i.supplierVillage }}</td>
+      <td>{{ i.receiver }}</td>
+      <td class="actions">
+        {% if request.user.is_superuser %}
+        <a class="btn btn-sm btn-danger" href="{% url 'intake_reverse' i.pk %}">冲销</a>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">暂无鲜叶签收记录。</p>
+{% endif %}

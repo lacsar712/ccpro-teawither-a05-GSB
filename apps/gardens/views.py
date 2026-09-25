@@ -1,10 +1,15 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Sum
 from django.http import HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse_lazy
+from django.utils import timezone
+from django.views import View
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -12,16 +17,28 @@ from django.views.generic import (
     UpdateView,
 )
 
-from .forms import GardenForm, TroughForm, WitherBatchForm
-from .models import Garden, Trough, WitherBatch
+from .forms import GardenForm, LeafIntakeForm, TroughForm, WitherBatchForm
+from .models import Garden, LeafIntake, Trough, WitherBatch
 
 
 def _wants_htmx(request):
     return request.headers.get("HX-Request") == "true"
 
 
+def _week_start():
+    """本周周一 00:00（本地时区）。"""
+    now = timezone.localtime()
+    monday = now - timedelta(days=now.weekday())
+    return monday.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
 @login_required
 def home(request):
+    week_intake_kg = (
+        LeafIntake.objects.filter(isReversed=False, receivedAt__gte=_week_start())
+        .aggregate(total=Sum("leafKg"))["total"]
+        or 0
+    )
     context = {
         "garden_count": Garden.objects.count(),
         "trough_count": Trough.objects.count(),
@@ -33,6 +50,7 @@ def home(request):
         "loading_count": Trough.objects.filter(
             status=Trough.STATUS_LOADING
         ).count(),
+        "week_intake_kg": week_intake_kg,
     }
     return render(request, "home.html", context)
 
@@ -200,3 +218,72 @@ class BatchDeleteView(LoginRequiredMixin, DeleteView):
     def form_valid(self, form):
         messages.success(self.request, "萎凋批次已删除")
         return super().form_valid(form)
+
+
+# ---- LeafIntake（鲜叶签收） ----
+
+
+class IntakeListView(LoginRequiredMixin, ListView):
+    model = LeafIntake
+    template_name = "intakes/list.html"
+    context_object_name = "intakes"
+
+    def get_queryset(self):
+        return LeafIntake.objects.filter(isReversed=False).select_related(
+            "trough", "trough__garden"
+        )
+
+    def get(self, request, *args, **kwargs):
+        self.object_list = self.get_queryset()
+        if _wants_htmx(request):
+            html = render_to_string(
+                "intakes/_table.html",
+                {"intakes": self.object_list},
+                request=request,
+            )
+            return HttpResponse(html)
+        return super().get(request, *args, **kwargs)
+
+
+class IntakeCreateView(LoginRequiredMixin, CreateView):
+    model = LeafIntake
+    form_class = LeafIntakeForm
+    template_name = "intakes/form.html"
+    success_url = reverse_lazy("intake_list")
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial["receiver"] = self.request.user.username
+        initial["receivedAt"] = timezone.localtime().strftime("%Y-%m-%dT%H:%M")
+        return initial
+
+    def form_valid(self, form):
+        messages.success(self.request, "鲜叶签收已登记")
+        return super().form_valid(form)
+
+
+class IntakeReverseView(LoginRequiredMixin, View):
+    """冲销签收：仅主管（超级用户）可操作；冲销后不计入累计与本周合计。"""
+
+    template_name = "intakes/confirm_reverse.html"
+
+    def _denied(self, request):
+        messages.error(request, "仅主管可冲销签收。")
+        return redirect("intake_list")
+
+    def get(self, request, pk):
+        if not request.user.is_superuser:
+            return self._denied(request)
+        intake = get_object_or_404(LeafIntake, pk=pk, isReversed=False)
+        return render(request, self.template_name, {"object": intake})
+
+    def post(self, request, pk):
+        if not request.user.is_superuser:
+            return self._denied(request)
+        intake = get_object_or_404(LeafIntake, pk=pk, isReversed=False)
+        intake.isReversed = True
+        intake.reversedAt = timezone.now()
+        intake.reversedBy = request.user.username
+        intake.save()
+        messages.success(request, "签收已冲销")
+        return redirect("intake_list")
