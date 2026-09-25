@@ -193,6 +193,18 @@ table.data tr:hover td {
   background: #fafcf9;
 }
 
+table.data tr.this-week td {
+  background: #f3faf2;
+}
+
+table.data tfoot td {
+  border-top: 2px solid var(--tea-accent);
+  border-bottom: none;
+  font-weight: 700;
+  color: var(--tea-green-dark);
+  background: var(--tea-green-light);
+}
+
 .badge {
   display: inline-block;
   padding: 0.15rem 0.5rem;

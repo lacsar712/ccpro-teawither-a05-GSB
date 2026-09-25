@@ -1,6 +1,7 @@
 from django import forms
+from django.utils import timezone
 
-from .models import Garden, Trough, WitherBatch
+from .models import Garden, LeafReceipt, Trough, WitherBatch
 
 
 class GardenForm(forms.ModelForm):
@@ -60,7 +61,49 @@ class WitherBatchForm(forms.ModelForm):
             "%Y-%m-%d %H:%M",
         ]
         if self.instance and self.instance.pk and self.instance.startedAt:
-            from django.utils import timezone
-
             local = timezone.localtime(self.instance.startedAt)
             self.initial["startedAt"] = local.strftime("%Y-%m-%dT%H:%M")
+
+
+class LeafReceiptForm(forms.ModelForm):
+    class Meta:
+        model = LeafReceipt
+        fields = ["trough", "kg", "receivedAt", "village", "receiver"]
+        widgets = {
+            "trough": forms.Select(attrs={"class": "input"}),
+            "kg": forms.NumberInput(
+                attrs={"class": "input", "step": "0.01", "min": "0.01"}
+            ),
+            "receivedAt": forms.DateTimeInput(
+                attrs={"class": "input", "type": "datetime-local"},
+                format="%Y-%m-%dT%H:%M",
+            ),
+            "village": forms.TextInput(attrs={"class": "input"}),
+            "receiver": forms.TextInput(attrs={"class": "input"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["receivedAt"].input_formats = [
+            "%Y-%m-%dT%H:%M",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+        ]
+        # 仅装叶中槽可签收；萎凋中与可下槽槽位不出现在选择中。
+        self.fields["trough"].queryset = Trough.objects.filter(
+            status=Trough.STATUS_LOADING
+        ).select_related("garden")
+        if not self.instance or not self.instance.pk:
+            self.initial["receivedAt"] = timezone.localtime().strftime(
+                "%Y-%m-%dT%H:%M"
+            )
+        elif self.instance.receivedAt:
+            self.initial["receivedAt"] = timezone.localtime(
+                self.instance.receivedAt
+            ).strftime("%Y-%m-%dT%H:%M")
+
+    def clean_kg(self):
+        kg = self.cleaned_data.get("kg")
+        if kg is not None and kg <= 0:
+            raise forms.ValidationError("鲜叶千克必须为正数。")
+        return kg

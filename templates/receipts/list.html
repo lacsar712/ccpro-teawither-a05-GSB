@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}鲜叶签收{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>鲜叶签收</h1>
+  <div class="actions">
+    <button class="btn btn-secondary btn-sm"
+            hx-get="{% url 'receipt_list' %}"
+            hx-target="#receipt-table"
+            hx-swap="innerHTML">刷新列表</button>
+    <a class="btn" href="{% url 'receipt_create' %}">鲜叶签收</a>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:1rem">
+  <p class="muted" style="margin:0">
+    规则说明：
+    ① 仅「装叶中」槽可签收，萎凋中与可下槽槽位拒绝；
+    ② 鲜叶千克必须为正，同槽装叶中期间累计签收千克不得超过该槽装叶量，超出拒绝并回显已累计千克；
+    ③ 该槽若已有萎凋批次，单次签收千克不得超过同槽最新批次目标含水率百分数的数值本身（例：目标含水 40.00% 即单次上限 40kg）；
+    ④ 萎凋工可签收，冲销签收仅主管可操作。
+  </p>
+</div>
+
+<div class="card" id="receipt-table">
+  {% include "receipts/_table.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}冲销签收{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>冲销鲜叶签收</h1>
+</div>
+<div class="card">
+  <p>确认冲销签收单「{{ object }}」（供货村：{{ object.village }}，签收人：{{ object.receiver }}）？</p>
+  <p class="muted">冲销后该槽已累计签收千克将相应减少。冲销操作仅限主管。</p>
+  <form method="post" class="actions">
+    {% csrf_token %}
+    <button class="btn btn-danger" type="submit">确认冲销</button>
+    <a class="btn btn-secondary" href="{% url 'receipt_list' %}">取消</a>
+  </form>
+</div>
+{% endblock %}

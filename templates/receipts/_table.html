@@ -1,0 +1,43 @@
+{% if receipts %}
+<table class="data">
+  <thead>
+    <tr>
+      <th>所属槽位</th>
+      <th>鲜叶千克</th>
+      <th>签收时刻</th>
+      <th>供货村名</th>
+      <th>签收人</th>
+      <th>操作</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in receipts %}
+    <tr class="{% if r.receivedAt >= week_start %}this-week{% endif %}">
+      <td>{{ r.trough.garden.name }} / {{ r.trough.troughCode }}</td>
+      <td>{{ r.kg }} kg{% if r.receivedAt >= week_start %} <span class="badge badge-loading">本周</span>{% endif %}</td>
+      <td>{{ r.receivedAt|date:"Y-m-d H:i" }}</td>
+      <td>{{ r.village }}</td>
+      <td>{{ r.receiver }}</td>
+      <td class="actions">
+        {% if user.is_staff %}
+        <a class="btn btn-sm btn-danger" href="{% url 'receipt_reverse' r.pk %}">冲销</a>
+        {% else %}
+        <span class="muted">—</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  {% if week_receipts %}
+  <tfoot>
+    <tr class="sum-row">
+      <td>本周签收合计（{{ week_start|date:"Y-m-d" }} 起，{{ week_receipts|length }} 行逐行相加）</td>
+      <td>{{ week_receipt_kg|floatformat:2 }} kg</td>
+      <td colspan="4"></td>
+    </tr>
+  </tfoot>
+  {% endif %}
+</table>
+{% else %}
+<p class="empty">暂无鲜叶签收。</p>
+{% endif %}

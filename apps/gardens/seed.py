@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from .models import Garden, Trough, WitherBatch
+from .models import Garden, LeafReceipt, Trough, WitherBatch
 
 
 def ensure_seed_data():
@@ -92,3 +92,30 @@ def ensure_seed_data():
     )
     t4.status = Trough.STATUS_READY
     t4.save()
+
+    # 装叶中槽 + 一笔恰好等于目标含水限值(40kg)的签收：
+    # 再签收 >40kg 会被「目标含水联锁」拒绝，>55kg 还会超装叶量。
+    LeafReceipt.objects.create(
+        trough=t2,
+        kg=Decimal("40.00"),
+        receivedAt=now - timezone.timedelta(hours=1),
+        village="青岭村",
+        receiver="witherer",
+    )
+
+    # 装叶中槽：已累计签收 96kg，装叶量 100kg，
+    # 再签任意 >4kg 的一笔即超装叶量，被拒绝并回显已累计 96kg。
+    t5 = Trough.objects.create(
+        garden=g1,
+        troughCode="A-03",
+        cultivar="福鼎大白",
+        loadKg=Decimal("100.00"),
+        status=Trough.STATUS_LOADING,
+    )
+    LeafReceipt.objects.create(
+        trough=t5,
+        kg=Decimal("96.00"),
+        receivedAt=now - timezone.timedelta(minutes=40),
+        village="云雾村",
+        receiver="witherer",
+    )

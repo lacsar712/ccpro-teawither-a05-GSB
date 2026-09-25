@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
@@ -11,9 +11,10 @@ from django.views.generic import (
     ListView,
     UpdateView,
 )
+from decimal import Decimal
 
-from .forms import GardenForm, TroughForm, WitherBatchForm
-from .models import Garden, Trough, WitherBatch
+from .forms import GardenForm, LeafReceiptForm, TroughForm, WitherBatchForm
+from .models import Garden, LeafReceipt, Trough, WitherBatch
 
 
 def _wants_htmx(request):
@@ -33,6 +34,8 @@ def home(request):
         "loading_count": Trough.objects.filter(
             status=Trough.STATUS_LOADING
         ).count(),
+        # 本周签收千克合计：与签收列表中本周各行千克相加严格相等（同源查询）。
+        "week_receipt_kg": LeafReceipt.week_kg(),
     }
     return render(request, "home.html", context)
 
@@ -199,4 +202,70 @@ class BatchDeleteView(LoginRequiredMixin, DeleteView):
 
     def form_valid(self, form):
         messages.success(self.request, "萎凋批次已删除")
+        return super().form_valid(form)
+
+
+# ---- LeafReceipt（鲜叶签收）----
+
+
+class ReceiptListView(LoginRequiredMixin, ListView):
+    model = LeafReceipt
+    template_name = "receipts/list.html"
+    context_object_name = "receipts"
+
+    def get_queryset(self):
+        return LeafReceipt.objects.select_related(
+            "trough", "trough__garden"
+        ).all()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        week_start = LeafReceipt.week_start()
+        week_receipts = [r for r in self.object_list if r.receivedAt >= week_start]
+        # 显式逐行求和，确保页面合计与各行相加一致。
+        context["week_start"] = week_start
+        context["week_receipts"] = week_receipts
+        context["week_receipt_kg"] = sum(
+            (r.kg for r in week_receipts), Decimal("0")
+        )
+        return context
+
+    def get(self, request, *args, **kwargs):
+        self.object_list = self.get_queryset()
+        if _wants_htmx(request):
+            html = render_to_string(
+                "receipts/_table.html",
+                self.get_context_data(),
+                request=request,
+            )
+            return HttpResponse(html)
+        return super().get(request, *args, **kwargs)
+
+
+class ReceiptCreateView(LoginRequiredMixin, CreateView):
+    model = LeafReceipt
+    form_class = LeafReceiptForm
+    template_name = "receipts/form.html"
+    success_url = reverse_lazy("receipt_list")
+
+    def form_valid(self, form):
+        messages.success(
+            self.request,
+            f"鲜叶已签收：{form.instance.trough} {form.instance.kg}kg",
+        )
+        return super().form_valid(form)
+
+
+class ReceiptReverseView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    """冲销签收 = 删除签收单；仅主管（is_staff）可操作，萎凋工被拒绝。"""
+
+    model = LeafReceipt
+    template_name = "receipts/confirm_reverse.html"
+    success_url = reverse_lazy("receipt_list")
+
+    def test_func(self):
+        return self.request.user.is_staff
+
+    def form_valid(self, form):
+        messages.success(self.request, "签收已冲销")
         return super().form_valid(form)

@@ -40,4 +40,11 @@ urlpatterns = [
         views.BatchDeleteView.as_view(),
         name="batch_delete",
     ),
+    path("receipts/", views.ReceiptListView.as_view(), name="receipt_list"),
+    path("receipts/new/", views.ReceiptCreateView.as_view(), name="receipt_create"),
+    path(
+        "receipts/<int:pk>/reverse/",
+        views.ReceiptReverseView.as_view(),
+        name="receipt_reverse",
+    ),
 ]

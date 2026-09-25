@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: teawither
       POSTGRES_PASSWORD: teawither
     ports:
-      - "5530:5432"
+      - "5540:5432"
     volumes:
       - teawither_pg:/var/lib/postgresql/data
     healthcheck:
@@ -19,7 +19,7 @@ services:
   web:
     build: .
     ports:
-      - "4190:4100"
+      - "4200:4100"
     environment:
       DJANGO_DEBUG: "0"
       DJANGO_ALLOWED_HOSTS: "*"
